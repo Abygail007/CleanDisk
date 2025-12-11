@@ -6,6 +6,10 @@ function Invoke-CdDiskWipeAndFormat {
         .DESCRIPTION
         - WipeMode 'Fast'   : Clear-Disk + GPT + partition + format NTFS rapide
         - WipeMode 'Secure' : Clear-Disk + GPT + partition + format NTFS complet (-Full)
+
+        Si PreEncryptWithBitLocker est active, le disque est d'abord chiffre avec
+        BitLocker (donnees EXISTANTES), puis efface. Cela garantit que les donnees
+        sont irrecuperables meme avec des outils de forensics.
     #>
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
@@ -22,11 +26,15 @@ function Invoke-CdDiskWipeAndFormat {
         [ValidateSet('Fast', 'Secure')]
         [string]$WipeMode = 'Fast',
 
-        # Option : pré-chiffrement BitLocker (pour l'instant log seulement)
+        # Option : pre-chiffrement BitLocker avant effacement
         [switch]$PreEncryptWithBitLocker,
 
         # Option : NE PAS creer de partition apres le wipe (defaut: on cree)
-        [switch]$NoPartition
+        [switch]$NoPartition,
+
+        # Callback pour la progression BitLocker (0-100)
+        [Parameter(Mandatory = $false)]
+        [scriptblock]$BitLockerProgressCallback
     )
 
     # UTILISER DIRECTEMENT LE PARAMETRE - PAS DE VARIABLE INTERMEDIAIRE
@@ -137,7 +145,71 @@ public class ErrorMode {
             Set-Disk -Number $diskNumber -IsReadOnly:$false -ErrorAction Stop
         }
 
-        # IMPORTANT : retirer toutes les lettres de lecteur avant l'effacement
+        # Pre-chiffrement BitLocker si demande - AVANT de retirer les lettres de lecteur
+        # IMPORTANT : On chiffre les donnees EXISTANTES, pas un disque vide !
+        if ($preEncryptFlag) {
+            Write-Verbose "[Invoke-CdDiskWipeAndFormat] Pre-chiffrement BitLocker demande (donnees existantes)..."
+
+            # S'assurer qu'il y a une lettre de lecteur pour BitLocker
+            $blDriveLetter = $null
+            $partitions = Get-Partition -DiskNumber $diskNumber -ErrorAction SilentlyContinue |
+                          Where-Object { $_.DriveLetter }
+
+            if ($partitions) {
+                $blDriveLetter = ($partitions | Select-Object -First 1).DriveLetter
+                Write-Verbose "[Invoke-CdDiskWipeAndFormat] Lettre de lecteur existante : $blDriveLetter"
+            }
+            else {
+                # Essayer d'assigner une lettre temporaire pour BitLocker
+                $allPartitions = Get-Partition -DiskNumber $diskNumber -ErrorAction SilentlyContinue |
+                                 Where-Object { $_.Type -ne 'Reserved' -and $_.Size -gt 100MB }
+
+                if ($allPartitions) {
+                    $targetPartition = $allPartitions | Select-Object -First 1
+                    $availableLetters = [char[]](69..90) | Where-Object { -not (Get-PSDrive -Name $_ -ErrorAction SilentlyContinue) }
+
+                    if ($availableLetters) {
+                        $blDriveLetter = $availableLetters[0]
+                        Add-PartitionAccessPath -DiskNumber $diskNumber `
+                                               -PartitionNumber $targetPartition.PartitionNumber `
+                                               -AccessPath "$($blDriveLetter):" `
+                                               -ErrorAction SilentlyContinue
+                        Write-Verbose "[Invoke-CdDiskWipeAndFormat] Lettre temporaire assignee : $blDriveLetter"
+                    }
+                }
+            }
+
+            if ($blDriveLetter) {
+                if (Get-Command Enable-CdBitLockerEncryption -ErrorAction SilentlyContinue) {
+                    # Passer le callback de progression si fourni
+                    $blParams = @{
+                        DiskNumber  = $diskNumber
+                        DriveLetter = $blDriveLetter
+                    }
+
+                    if ($BitLockerProgressCallback) {
+                        $blParams['ProgressCallback'] = $BitLockerProgressCallback
+                    }
+
+                    $blResult = Enable-CdBitLockerEncryption @blParams
+
+                    if (-not $blResult) {
+                        Write-Warning "[Invoke-CdDiskWipeAndFormat] Echec du pre-chiffrement BitLocker. Continuation sans."
+                    }
+                    else {
+                        Write-Verbose "[Invoke-CdDiskWipeAndFormat] Pre-chiffrement BitLocker termine avec succes."
+                    }
+                }
+                else {
+                    Write-Warning "[Invoke-CdDiskWipeAndFormat] Fonction Enable-CdBitLockerEncryption non disponible."
+                }
+            }
+            else {
+                Write-Warning "[Invoke-CdDiskWipeAndFormat] Aucune partition trouvee pour BitLocker. Continuation sans chiffrement."
+            }
+        }
+
+        # APRES BitLocker : retirer toutes les lettres de lecteur avant l'effacement
         try {
             $partitions = Get-Partition -DiskNumber $diskNumber -ErrorAction SilentlyContinue
             if ($partitions) {
@@ -155,32 +227,6 @@ public class ErrorMode {
         }
         catch {
             Write-Verbose "[Invoke-CdDiskWipeAndFormat] Impossible de retirer les lettres de lecteur : $_"
-        }
-
-        # Pre-chiffrement BitLocker si demande (EXPERIMENTAL - TRES LONG)
-        if ($preEncryptFlag) {
-            Write-Verbose "[Invoke-CdDiskWipeAndFormat] Pre-chiffrement BitLocker demande..."
-            
-            # Creer une partition temporaire pour BitLocker
-            Clear-Disk -Number $diskNumber -RemoveData -Confirm:$false -ErrorAction Stop
-            Initialize-Disk -Number $diskNumber -PartitionStyle GPT -ErrorAction SilentlyContinue
-            $tempPartition = New-Partition -DiskNumber $diskNumber -UseMaximumSize -AssignDriveLetter -ErrorAction Stop
-            Format-Volume -Partition $tempPartition -FileSystem NTFS -NewFileSystemLabel "TEMP_BL" -Confirm:$false -ErrorAction Stop | Out-Null
-            
-            $tempLetter = $tempPartition.DriveLetter
-            
-            if (Get-Command Enable-CdBitLockerEncryption -ErrorAction SilentlyContinue) {
-                $blResult = Enable-CdBitLockerEncryption -DiskNumber $diskNumber -DriveLetter $tempLetter
-                if (-not $blResult) {
-                    Write-Warning "[Invoke-CdDiskWipeAndFormat] Echec du pre-chiffrement BitLocker. Continuation sans."
-                }
-            }
-            else {
-                Write-Warning "[Invoke-CdDiskWipeAndFormat] Fonction Enable-CdBitLockerEncryption non disponible."
-            }
-            
-            # Nettoyer la partition temporaire
-            Remove-Partition -DriveLetter $tempLetter -Confirm:$false -ErrorAction SilentlyContinue
         }
 
         # 1) Effacement du disque selon le mode choisi (Fast ou Secure)

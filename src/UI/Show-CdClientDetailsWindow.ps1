@@ -30,15 +30,27 @@ function Show-CdClientDetailsWindow {
         Add-Type -AssemblyName PresentationFramework -ErrorAction SilentlyContinue
         Add-Type -AssemblyName PresentationCore -ErrorAction SilentlyContinue
 
-        $root = Get-CdRootDirectory
-        $xamlPath = Join-Path $root 'src\UI\ClientDetailsWindow.xaml'
+        # Charger le XAML (mode portable ou fichier)
+        $xamlContent = $null
 
-        if (-not (Test-Path $xamlPath)) {
-            Write-Error "Fichier XAML introuvable : $xamlPath"
-            return $result
+        # Mode portable : XAML embarque
+        if ($script:IsPortableMode -and $script:EmbeddedClientDetailsXAML) {
+            $xamlContent = $script:EmbeddedClientDetailsXAML
+        }
+        else {
+            # Mode normal : lire depuis fichier
+            $root = Get-CdRootDirectory
+            $xamlPath = Join-Path $root 'src\UI\ClientDetailsWindow.xaml'
+
+            if (-not (Test-Path $xamlPath)) {
+                Write-Error "Fichier XAML introuvable : $xamlPath"
+                return $result
+            }
+
+            $xamlContent = Get-Content -Path $xamlPath -Raw -Encoding UTF8
         }
 
-        [xml]$xaml = Get-Content -Path $xamlPath -Encoding UTF8
+        [xml]$xaml = $xamlContent
         $reader = New-Object System.Xml.XmlNodeReader $xaml
         $window = [System.Windows.Markup.XamlReader]::Load($reader)
 

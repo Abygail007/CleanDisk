@@ -5,7 +5,9 @@
       "Bash(Sort-Object LastWriteTime -Descending)",
       "Bash(Select-Object -First 10)",
       "Bash(powershell -Command \"Get-Partition -DriveLetter ''C'' | Select-Object DiskNumber\")",
-      "Bash(powershell -NoProfile -Command:*)"
+      "Bash(powershell -NoProfile -Command:*)",
+      "Bash(Get-ChildItem \"C:\\Users\\jmthomas\\Documents\\Creation\\Clean_Disk\\New\\Logs\" -Recurse)",
+      "Bash(Select-Object -First 15 FullName, LastWriteTime, Length)"
     ],
     "deny": [],
     "ask": []

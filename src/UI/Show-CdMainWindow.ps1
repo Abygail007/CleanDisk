@@ -96,19 +96,29 @@ public class DiskItem : INotifyPropertyChanged
         # La classe existe deja, pas de probleme
     }
 
-    if (-not $global:CdSrcPath) {
-        $root             = Get-CdRootDirectory
-        $global:CdSrcPath = Join-Path $root 'src'
+    # Charger le XAML (mode portable ou fichier)
+    $xaml = $null
+
+    # Mode portable : XAML embarque
+    if ($script:IsPortableMode -and $script:EmbeddedXAML) {
+        $xaml = $script:EmbeddedXAML
     }
+    else {
+        # Mode normal : lire depuis fichier
+        if (-not $global:CdSrcPath) {
+            $root             = Get-CdRootDirectory
+            $global:CdSrcPath = Join-Path $root 'src'
+        }
 
-    $xamlPath = Join-Path $global:CdSrcPath 'UI\CleanDisk.xaml'
+        $xamlPath = Join-Path $global:CdSrcPath 'UI\CleanDisk.xaml'
 
-    if (-not (Test-Path -LiteralPath $xamlPath)) {
-        Write-Error "Fichier XAML introuvable : $xamlPath"
-        return
+        if (-not (Test-Path -LiteralPath $xamlPath)) {
+            Write-Error "Fichier XAML introuvable : $xamlPath"
+            return
+        }
+
+        $xaml = Get-Content -LiteralPath $xamlPath -Raw -Encoding UTF8
     }
-
-    $xaml = Get-Content -LiteralPath $xamlPath -Raw -Encoding UTF8
 
     $stringReader = New-Object System.IO.StringReader $xaml
     $xmlReader    = [System.Xml.XmlReader]::Create($stringReader)
@@ -183,6 +193,7 @@ public class DiskItem : INotifyPropertyChanged
     $txtRapportPath       = $window.FindName('TxtRapportPath')
     $btnOpenLogsFolder    = $window.FindName('BtnOpenLogsFolder')
     $btnRestartSameClient = $window.FindName('BtnRestartSameClient')
+    $btnRestartNewClient  = $window.FindName('BtnRestartNewClient')
     $btnFinish            = $window.FindName('BtnFinish')
 
     # Navigation
@@ -423,6 +434,35 @@ public class DiskItem : INotifyPropertyChanged
 
     function Load-DiskList {
         try {
+            # Precacher toutes les partitions et volumes en une seule fois (BEAUCOUP plus rapide)
+            $allPartitions = @{}
+            $allVolumes = @{}
+            $allBitLocker = @{}
+
+            try {
+                Get-Partition -ErrorAction SilentlyContinue | ForEach-Object {
+                    if (-not $allPartitions.ContainsKey($_.DiskNumber)) {
+                        $allPartitions[$_.DiskNumber] = @()
+                    }
+                    $allPartitions[$_.DiskNumber] += $_
+                }
+            } catch { }
+
+            try {
+                Get-Volume -ErrorAction SilentlyContinue | Where-Object { $_.DriveLetter } | ForEach-Object {
+                    $allVolumes[$_.DriveLetter] = $_
+                }
+            } catch { }
+
+            try {
+                Get-BitLockerVolume -ErrorAction SilentlyContinue | ForEach-Object {
+                    $letter = $_.MountPoint -replace ':\\?$', ''
+                    if ($letter) {
+                        $allBitLocker[$letter] = $_
+                    }
+                }
+            } catch { }
+
             $disks = Get-CdDiskList
 
             # Utiliser une ObservableCollection avec la classe DiskItem
@@ -433,32 +473,27 @@ public class DiskItem : INotifyPropertyChanged
                 $driveLetter = ""
                 $bitLockerStatus = "Non"
 
-                try {
-                    $diskObj = Get-Disk -Number $d.Number -ErrorAction SilentlyContinue
-                    if ($diskObj) {
-                        $partitions = Get-Partition -DiskNumber $d.Number -ErrorAction SilentlyContinue
-                        foreach ($part in $partitions) {
-                            if ($part.DriveLetter) {
-                                $driveLetter = $part.DriveLetter
-                                $vol = Get-Volume -DriveLetter $part.DriveLetter -ErrorAction SilentlyContinue
-                                if ($vol) {
-                                    $usedSizeGB = [math]::Round(($vol.Size - $vol.SizeRemaining) / 1GB, 1)
-                                    $usedGB = "$usedSizeGB"
-                                }
-                                break
+                # Utiliser les caches au lieu de requetes individuelles
+                $partitions = $allPartitions[$d.Number]
+                if ($partitions) {
+                    foreach ($part in $partitions) {
+                        if ($part.DriveLetter) {
+                            $driveLetter = $part.DriveLetter
+                            $vol = $allVolumes[$driveLetter]
+                            if ($vol) {
+                                $usedSizeGB = [math]::Round(($vol.Size - $vol.SizeRemaining) / 1GB, 1)
+                                $usedGB = "$usedSizeGB"
                             }
-                        }
-
-                        if ($driveLetter) {
-                            $blvInfo = Get-BitLockerVolume -MountPoint "$($driveLetter):" -ErrorAction SilentlyContinue
-                            if ($blvInfo -and $blvInfo.ProtectionStatus -eq 'On') {
-                                $bitLockerStatus = "Oui"
-                            }
+                            break
                         }
                     }
-                }
-                catch {
-                    Write-Verbose "Erreur recuperation infos disque $($d.Number) : $_"
+
+                    if ($driveLetter) {
+                        $blvInfo = $allBitLocker[$driveLetter]
+                        if ($blvInfo -and $blvInfo.ProtectionStatus -eq 'On') {
+                            $bitLockerStatus = "Oui"
+                        }
+                    }
                 }
 
                 # Creer un objet DiskItem avec le bon numero
@@ -664,17 +699,29 @@ public class DiskItem : INotifyPropertyChanged
                 $targetBitLocker = [bool]$script:options.BitLocker
 
                 $txtLogs.AppendText("[$timestamp] Appel Invoke-CdDiskWipeAndFormat -DiskNumber $targetDiskNumber -WipeMode $targetWipeMode`r`n")
+                if ($targetBitLocker) {
+                    $txtLogs.AppendText("[$timestamp] [BitLocker] Pre-chiffrement des donnees existantes active (peut prendre plusieurs heures)...`r`n")
+                }
                 $txtLogs.ScrollToEnd()
                 [System.Windows.Forms.Application]::DoEvents()
 
                 # Appel DIRECT sans splatting pour eviter tout probleme
                 $noPartitionFlag = -not $script:options.CreatePartition
 
+                # Creer le callback BitLocker pour afficher la progression
+                $bitlockerCallback = {
+                    param([int]$percent)
+                    $ts = Get-Date -Format "HH:mm:ss"
+                    $txtLogs.AppendText("[$ts] [BitLocker] Chiffrement en cours : $percent%`r`n")
+                    $txtLogs.ScrollToEnd()
+                    [System.Windows.Forms.Application]::DoEvents()
+                }
+
                 if ($targetBitLocker -and $noPartitionFlag) {
-                    $result = Invoke-CdDiskWipeAndFormat -DiskNumber $targetDiskNumber -WipeMode $targetWipeMode -VolumeLabel $targetVolumeLabel -PreEncryptWithBitLocker -NoPartition
+                    $result = Invoke-CdDiskWipeAndFormat -DiskNumber $targetDiskNumber -WipeMode $targetWipeMode -VolumeLabel $targetVolumeLabel -PreEncryptWithBitLocker -NoPartition -BitLockerProgressCallback $bitlockerCallback
                 }
                 elseif ($targetBitLocker) {
-                    $result = Invoke-CdDiskWipeAndFormat -DiskNumber $targetDiskNumber -WipeMode $targetWipeMode -VolumeLabel $targetVolumeLabel -PreEncryptWithBitLocker
+                    $result = Invoke-CdDiskWipeAndFormat -DiskNumber $targetDiskNumber -WipeMode $targetWipeMode -VolumeLabel $targetVolumeLabel -PreEncryptWithBitLocker -BitLockerProgressCallback $bitlockerCallback
                 }
                 elseif ($noPartitionFlag) {
                     $result = Invoke-CdDiskWipeAndFormat -DiskNumber $targetDiskNumber -WipeMode $targetWipeMode -VolumeLabel $targetVolumeLabel -NoPartition
@@ -1137,12 +1184,34 @@ public class DiskItem : INotifyPropertyChanged
     # ========================================
 
     $btnRestartSameClient.Add_Click({
-        # Reinitialiser uniquement la selection de disques
+        # Reinitialiser uniquement la selection de disques, garder les infos client
         Update-StepDisplay -Step 1
         Load-DiskList
         $pbProgress.Value = 0
         $txtLogs.Text = ""
         $script:processedDisks = @()
+    })
+
+    $btnRestartNewClient.Add_Click({
+        # Reinitialiser tout - nouveau client = retour au dashboard
+        $cbSociete.Text = ""
+        $txtSite.Text = ""
+        $txtVille.Text = ""
+        # Garder le technicien (c'est probablement le meme)
+        $script:customerInfo = @{
+            Societe    = ""
+            Site       = ""
+            Ville      = ""
+            Technicien = $script:customerInfo.Technicien
+        }
+        $script:selectedDisks = @()
+        $script:processedDisks = @()
+        $pbProgress.Value = 0
+        $txtLogs.Text = ""
+
+        # Retour au dashboard pour voir l'activite recente
+        Load-DashboardStats
+        Update-StepDisplay -Step 0
     })
 
     # Bouton pour ouvrir le dossier des logs
