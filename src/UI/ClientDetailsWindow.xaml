@@ -1,0 +1,181 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Details Client"
+        Height="500"
+        Width="700"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize">
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- En-tete avec infos client -->
+        <Border Grid.Row="0" Background="#2c3e50" CornerRadius="8" Padding="20" Margin="0,0,0,15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <TextBlock x:Name="TxtClientName" Text="Nom du Client" FontSize="22" FontWeight="Bold" Foreground="White"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <TextBlock Text="Site : " Foreground="#bdc3c7" FontSize="13"/>
+                        <TextBlock x:Name="TxtClientSite" Text="-" Foreground="White" FontSize="13"/>
+                        <TextBlock Text="  |  Ville : " Foreground="#bdc3c7" FontSize="13" Margin="15,0,0,0"/>
+                        <TextBlock x:Name="TxtClientCity" Text="-" Foreground="White" FontSize="13"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock x:Name="TxtTotalDisks" Text="0" FontSize="28" FontWeight="Bold" Foreground="#3498db" HorizontalAlignment="Center"/>
+                    <TextBlock Text="disques effaces" Foreground="#bdc3c7" FontSize="11" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Boutons d'action -->
+        <Border Grid.Row="1" Background="#ecf0f1" CornerRadius="8" Padding="15" Margin="0,0,0,15">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Button x:Name="BtnNewSession"
+                        Content="Nouvelle session pour ce client"
+                        Background="#27ae60"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        Padding="20,12"
+                        Margin="0,0,10,0"
+                        Cursor="Hand">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}"
+                                                CornerRadius="5"
+                                                Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <Button x:Name="BtnOpenReports"
+                        Content="Ouvrir le dossier des rapports"
+                        Background="#3498db"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        Padding="20,12"
+                        Margin="0,0,10,0"
+                        Cursor="Hand">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}"
+                                                CornerRadius="5"
+                                                Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <Button x:Name="BtnViewHistory"
+                        Content="Voir tout l'historique"
+                        Background="#9b59b6"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        Padding="20,12"
+                        Cursor="Hand">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}"
+                                                CornerRadius="5"
+                                                Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Historique des sessions -->
+        <Border Grid.Row="2" Background="#f8f9fa" CornerRadius="8" Padding="15">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="Historique des effacements" FontSize="14" FontWeight="Bold" Margin="0,0,0,10"/>
+
+                <DataGrid x:Name="DgClientHistory"
+                         Grid.Row="1"
+                         AutoGenerateColumns="False"
+                         CanUserAddRows="False"
+                         CanUserDeleteRows="False"
+                         IsReadOnly="True"
+                         HeadersVisibility="Column"
+                         GridLinesVisibility="Horizontal"
+                         AlternatingRowBackground="#ffffff"
+                         Background="#f8f9fa">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Date" Binding="{Binding DateStr}" Width="140"/>
+                        <DataGridTextColumn Header="Technicien" Binding="{Binding Technicien}" Width="120"/>
+                        <DataGridTextColumn Header="Mode" Binding="{Binding WipeMode}" Width="80"/>
+                        <DataGridTextColumn Header="Disques" Binding="{Binding DiskCount}" Width="70"/>
+                        <DataGridTextColumn Header="Modele" Binding="{Binding Model}" Width="180"/>
+                        <DataGridTextColumn Header="S/N" Binding="{Binding Serial}" Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+        <!-- Bouton Fermer -->
+        <Button x:Name="BtnClose"
+                Grid.Row="3"
+                Content="Fermer"
+                Width="120"
+                Height="35"
+                Margin="0,15,0,0"
+                HorizontalAlignment="Right"
+                Background="#95a5a6"
+                Foreground="White"
+                FontWeight="Bold">
+            <Button.Style>
+                <Style TargetType="Button">
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}"
+                                        CornerRadius="5"
+                                        Padding="10,8">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </Button.Style>
+        </Button>
+    </Grid>
+</Window>

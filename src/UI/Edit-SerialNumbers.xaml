@@ -1,0 +1,83 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Edition des Serial Numbers"
+        Height="500"
+        Width="800"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize">
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- En-tête -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,15">
+            <TextBlock Text="Verification des Serial Numbers" 
+                      FontSize="18" 
+                      FontWeight="Bold"
+                      Margin="0,0,0,10"/>
+            <TextBlock Text="Verifiez et corrigez si necessaire les numeros de serie des disques effaces." 
+                      FontSize="12" 
+                      Foreground="Gray"
+                      TextWrapping="Wrap"/>
+            <TextBlock Text="Astuce : Pour les disques USB, notez le S/N sur l'étiquette physique avant effacement." 
+                      FontSize="11" 
+                      Foreground="#e67e22"
+                      FontStyle="Italic"
+                      TextWrapping="Wrap"
+                      Margin="0,5,0,0"/>
+        </StackPanel>
+
+        <!-- DataGrid éditable -->
+        <Border Grid.Row="1" BorderBrush="#dfe6e9" BorderThickness="1" CornerRadius="3">
+            <DataGrid x:Name="DgSerialNumbers" 
+                     AutoGenerateColumns="False" 
+                     CanUserAddRows="False"
+                     CanUserDeleteRows="False"
+                     HeadersVisibility="Column"
+                     GridLinesVisibility="Horizontal"
+                     AlternatingRowBackground="#f8f9fa"
+                     CanUserSortColumns="False">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="No" Binding="{Binding Number}" Width="50" IsReadOnly="True"/>
+                    <DataGridTextColumn Header="Modele" Binding="{Binding Model}" Width="250" IsReadOnly="True"/>
+                    <DataGridTextColumn Header="Taille" Binding="{Binding SizeGB}" Width="80" IsReadOnly="True"/>
+                    <DataGridTextColumn Header="Serial Number" Binding="{Binding Serial, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*" IsReadOnly="False">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Padding" Value="5"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                        <DataGridTextColumn.EditingElementStyle>
+                            <Style TargetType="TextBox">
+                                <Setter Property="Padding" Value="5"/>
+                                <Setter Property="BorderBrush" Value="#3498db"/>
+                                <Setter Property="BorderThickness" Value="2"/>
+                            </Style>
+                        </DataGridTextColumn.EditingElementStyle>
+                    </DataGridTextColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <!-- Boutons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button x:Name="BtnCancel" 
+                   Content="Annuler" 
+                   Width="100" 
+                   Height="35"
+                   Margin="0,0,10,0"
+                   FontSize="13"/>
+            <Button x:Name="BtnValidate" 
+                   Content="Valider et continuer" 
+                   Width="160" 
+                   Height="35"
+                   FontSize="13"
+                   Background="#27ae60"
+                   Foreground="White"/>
+        </StackPanel>
+    </Grid>
+</Window>

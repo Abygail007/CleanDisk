@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Select-Object -Property FullName,LastWriteTime)",
+      "Bash(Sort-Object LastWriteTime -Descending)",
+      "Bash(Select-Object -First 10)",
+      "Bash(powershell -Command \"Get-Partition -DriveLetter ''C'' | Select-Object DiskNumber\")",
+      "Bash(powershell -NoProfile -Command:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

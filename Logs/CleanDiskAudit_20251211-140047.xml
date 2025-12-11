@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<CleanDiskAudit>
+  <Disk>
+    <DiskNumber>1</DiskNumber>
+    <Model>SanDisk Cruzer Edge</Model>
+    <SizeGB>29.1</SizeGB>
+    <Bus>USB</Bus>
+    <Serial>200537532002DC327CD9</Serial>
+    <WipeMode>Fast</WipeMode>
+    <PreEncryptWithBitLocker>False</PreEncryptWithBitLocker>
+    <StartTime>12/11/2025 14:01:14</StartTime>
+    <EndTime>12/11/2025 14:01:38</EndTime>
+    <DurationSeconds>23</DurationSeconds>
+    <DriveLetter>D</DriveLetter>
+    <ComputerName>PORT-JMTHOMAS</ComputerName>
+    <UserName>jmthomas</UserName>
+    <Result>Success</Result>
+    <ErrorMessage>
+    </ErrorMessage>
+    <CustomerName>Logicia</CustomerName>
+    <SiteName>Le Mans</SiteName>
+    <City>Le Mans</City>
+    <TechnicianName>JMT</TechnicianName>
+    <SessionId>20251211-140047</SessionId>
+  </Disk>
+</CleanDiskAudit>
